@@ -34,7 +34,6 @@ const {verbose, 'dry-run':dry_run} = argv;
 print(`Starting 281-watcher-4-buckets`)
 
 
-
 try {
   main();
 }
@@ -68,6 +67,11 @@ async function s3_commit(input, Bucket, Key, o={}) {
 }
 
 async function main() {
+
+  {
+    const retv1 = await s3Client.listBuckets()
+    console.log({retv1})
+  }
 
   const doc = yaml.load(fs.readFileSync('./.fw4b.yaml', 'utf8'));
   console.log(doc);
