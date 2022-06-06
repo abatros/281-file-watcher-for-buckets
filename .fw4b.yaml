@@ -1,0 +1,15 @@
+version: 1.0.0
+ignored: [
+  node_modules,
+  .fw4b.yaml
+]
+
+watched: [
+  './**/*.html',
+  './*.css',
+  '*.js',
+  '*.yaml'
+]
+
+Bucket: test-bucket-3.1416
+Prefix: '281-fw4b'

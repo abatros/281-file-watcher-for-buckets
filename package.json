@@ -1,0 +1,21 @@
+{
+  "name": "281-watcher-4-bucket",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "bin": {
+    "fw4b": "index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "294-aws-s3": "^1.2.7",
+    "chokidar": "^3.5.3",
+    "js-yaml": "^4.1.0",
+    "mime-types": "^2.1.35"
+  }
+}
