@@ -3,12 +3,16 @@ import fs from 'fs';
 import path from 'path'
 import chokidar from 'chokidar';
 import yaml from 'js-yaml';
+import {s3_commit, s3Client} from './s3-commit.js';
+import {md2html} from './md2html.js'
+/*
 import mime from 'mime-types'
 // import { exec, execSync } from "child_process";
 import {get_accessKeys, S3} from '294-aws-s3';
 
 export const s3Client = new S3(get_accessKeys());
 //export const Bucket = 'cb-survey'
+*/
 
 const print = console.log.bind(console); // interesting
 
@@ -42,29 +46,6 @@ catch (e) {
  process.exit();
 }
 
-async function s3_commit(input, Bucket, Key, o={}) {
-  const {ACL='public-read', ContentType, verbose} = o;
-
-  print(`s3-commit@31 (${input}) Key:${Key}`)
-//  print({s3Client})
-  const mime_type = mime.lookup(Key)
-  const encoding = (mime_type.startsWith('text/')?{encoding:'utf8'}:{})
-
-  const Body = fs.readFileSync(input, encoding)
-  //console.log({Body})
-
-  const retv2 = await s3Client.putObject({
-      Bucket, Key, Body,
-      ACL,
-      ContentType, // if not specified, auto-detect mime from filename extension.
-      verbose
-      })
-
-  ;(verbose >0) && console.log(`putObject:`,retv2)
-
-
-  return retv2
-}
 
 async function main() {
 
@@ -91,16 +72,70 @@ async function main() {
     ignoreInitial: true,
     ignored,
   }).on('all', async (event, fpath) => {
-    console.log(`watcher@54: [${event}] <${fpath}> Prefix:(${Prefix})`);
-    switch(event) {
-      case 'add':
-      case 'change': {
-        console.log
-        const Key = path.join(Prefix,fpath)
-        const retv = await s3_commit(fpath,Bucket,Key,{verbose:0})
-        console.log(`s3-commit@67 =>`,retv)
+    try {
+      console.log(`watcher@54: [${event}] <${fpath}> Prefix:(${Prefix})`);
+      switch(event) {
+        case 'add':
+        case 'change': {
+          const Key = path.join(Prefix,fpath)
+          /*
+              FIRST save file as it (the original)
+          */
+          const retv = await s3_commit(fpath,Bucket,Key,{verbose:0})
+          console.log(`s3-commit@67 =>`,retv)
+
+          /*
+              THEN if .MD file, operate a renderer
+              and save HTML generated.
+          */
+
+          const {ext,dir} = path.parse(fpath);
+          if (ext == '.md') {
+            if (!fpath.startsWith('.')) fpath = './'+fpath;
+            const {html:body ,metadata} = md2html(fpath)
+            if (body) {
+              const {template = './main.html'} = metadata;
+              console.log({template})
+              /*
+                  we should have lookup template
+                  FIRST: current folder
+                  THEN : parent
+              */
+              const template_fn = path.join(dir,template)
+              const main = fs.readFileSync(template_fn, 'utf8');
+              if (!main) {
+                print(`@101 missing template <${main}> <${template_fn}>`)
+                break; // we are in a switch ! should work.
+              }
+
+              /*
+              Because the dot . explicitly does not match newline characters.
+              */
+//              const html = main.replace(/<body>[\s\S]*<\/body>/,body)
+              const html = main.replace(/<slot *\/>/,body)
+              print({html})
+              const html_Key = Key.replace(/\.md$/,'.html')
+              const retv = await s3Client.putObject(html,Bucket, html_Key,{
+                verbose: 0,
+                ContentType: 'text/html',
+                ACL: 'public-read',
+              })
+              print(`s3-commit@101 <${Bucket}/${html_Key}> =>`,retv)
+            } else {
+              print(`md2html@103 did not return html code`)
+            }
+          }
+
+        }
+        break;
+
+        default: {
+          print(`Invalid event <${event}> Ignored.`)
+        }
+
       }
-      break;
+    } catch(e) {
+      console.log(`ALERT@107 failed to process event <${event}> :`,e)
     }
   });
 
