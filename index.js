@@ -108,13 +108,14 @@ async function main() {
                 break; // we are in a switch ! should work.
               }
 
-              /*
-              Because the dot . explicitly does not match newline characters.
-              */
-//              const html = main.replace(/<body>[\s\S]*<\/body>/,body)
+
               const html = main.replace(/<slot *\/>/,body)
-              print({html})
-              const html_Key = Key.replace(/\.md$/,'.html')
+                .replace(/<title>[^<]*<\/title>/, `<title>${metadata.title}</title>`)
+
+              ;(verbose >=2) && print({html})
+              const html_Key = Key.replace(/\.md$/,'.html').replace('\\','/')
+              print(`index@117 about to putObject <${Bucket}/${html_Key}> ...`)
+
               const retv = await s3Client.putObject(html,Bucket, html_Key,{
                 verbose: 0,
                 ContentType: 'text/html',
@@ -122,7 +123,7 @@ async function main() {
               })
               print(`s3-commit@101 <${Bucket}/${html_Key}> =>`,retv)
             } else {
-              print(`md2html@103 did not return html code`)
+              print(`ALERT! md2html@103 did not return html code`)
             }
           }
 
