@@ -5,6 +5,7 @@ import {marked} from 'marked';
 const renderer = new marked.Renderer();
 import yaml from 'js-yaml'
 
+const verbose =0;
 
 function extract_metadata(s) {
   if (!s.startsWith('---')) {
@@ -60,8 +61,8 @@ export function md2html(data, o={}) {
 
   const html = marked(md_code, {renderer});
 
-  console.log({metadata})
-  console.log({html})
+  ;(verbose >0) && console.log({metadata})
+  ;(verbose >0) &&   console.log({html})
 
 
   return {html, metadata}

@@ -3,8 +3,16 @@ import fs from 'fs';
 import path from 'path'
 import chokidar from 'chokidar';
 import yaml from 'js-yaml';
-import {s3_commit, s3Client} from './s3-commit.js';
+//import {s3_commit, s3Client} from './s3-commit.js';
 import {md2html} from './md2html.js'
+
+import mime from 'mime-types'
+// import { exec, execSync } from "child_process";
+import {get_accessKeys, S3} from '294-aws-s3';
+
+const print = console.log.bind(console); // interesting
+
+
 /*
 import mime from 'mime-types'
 // import { exec, execSync } from "child_process";
@@ -14,7 +22,6 @@ export const s3Client = new S3(get_accessKeys());
 //export const Bucket = 'cb-survey'
 */
 
-const print = console.log.bind(console); // interesting
 
 import yargs from 'yargs';
 
@@ -38,6 +45,28 @@ const {verbose, 'dry-run':dry_run} = argv;
 print(`Starting 281-watcher-4-buckets`)
 
 
+
+const doc = yaml.load(fs.readFileSync('./.fw4b.yaml', 'utf8'));
+;(verbose >0) && console.log(doc);
+
+const {watched:watch_list,
+  ignored, Prefix='', Bucket,
+  s3cfg //= '/home/dkz/.s3cfg'
+  } = doc
+
+
+const s3Client = new S3(get_accessKeys(s3cfg));
+
+if (verbose >0) {
+  console.log({watch_list})
+  console.log({ignored})
+  console.log({Bucket})
+  console.log({Prefix})
+  console.log({s3cfg})
+}
+
+
+
 try {
   main();
 }
@@ -47,24 +76,16 @@ catch (e) {
 }
 
 
+
+
+
 async function main() {
+
 
   {
     const retv1 = await s3Client.listBuckets()
     console.log({retv1})
   }
-
-  const doc = yaml.load(fs.readFileSync('./.fw4b.yaml', 'utf8'));
-  console.log(doc);
-
-
-  const {watched:watch_list,
-    ignored, Prefix='', Bucket} = doc
-
-  console.log({watch_list})
-  console.log({ignored})
-  console.log({Bucket})
-  console.log({Prefix})
 
 
   const watcher = chokidar.watch(watch_list,{
@@ -73,7 +94,7 @@ async function main() {
     ignored,
   }).on('all', async (event, fpath) => {
     try {
-      console.log(`watcher@54: [${event}] <${fpath}> Prefix:(${Prefix})`);
+      ;(verbose>0) && console.log(`watcher@54: [${event}] <${fpath}> Prefix:(${Prefix})`);
       switch(event) {
         case 'add':
         case 'change': {
@@ -95,7 +116,7 @@ async function main() {
             const {html:body ,metadata} = md2html(fpath)
             if (body) {
               const {template = './main.html'} = metadata;
-              console.log({template})
+              ;(verbose>0) && console.log({template})
               /*
                   we should have lookup template
                   FIRST: current folder
@@ -114,7 +135,7 @@ async function main() {
 
               ;(verbose >=2) && print({html})
               const html_Key = Key.replace(/\.md$/,'.html').replace('\\','/')
-              print(`index@117 about to putObject <${Bucket}/${html_Key}> ...`)
+              ;(verbose>0) && print(`index@117 about to putObject <${Bucket}/${html_Key}> ...`)
 
               const retv = await s3Client.putObject(html,Bucket, html_Key,{
                 verbose: 0,
@@ -185,4 +206,30 @@ function main2_Obsolete() {
     atomic: true // or a custom 'atomicity delay', in milliseconds (default 100)
   });
 
+}
+
+
+
+
+export async function s3_commit(input, Bucket, Key, o={}) {
+  const {ACL='public-read', ContentType, verbose} = o;
+
+  print(`s3-commit@31 (${input}) Key:${Key}`)
+//  print({s3Client})
+  const mime_type = mime.lookup(Key)
+  const encoding = (mime_type.startsWith('text/')?{encoding:'utf8'}:{})
+
+  const Body = fs.readFileSync(input, encoding)
+  //console.log({Body})
+
+  const retv2 = await s3Client.putObject({
+      Bucket, Key, Body,
+      ACL,
+      ContentType, // if not specified, auto-detect mime from filename extension.
+      verbose
+      })
+
+  ;(verbose >0) && console.log(`putObject:`,retv2)
+
+  return retv2
 }
